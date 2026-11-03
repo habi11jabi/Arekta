@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import com.example.data.model.AppUser
 import com.example.data.model.Employee
 import com.example.data.model.Expense
 import com.example.data.model.Product
@@ -11,8 +12,8 @@ import com.example.data.model.SalaryPayment
 import com.example.data.model.Sale
 
 @Database(
-    entities = [Product::class, Sale::class, Expense::class, Employee::class, SalaryPayment::class],
-    version = 2,
+    entities = [Product::class, Sale::class, Expense::class, Employee::class, SalaryPayment::class, AppUser::class],
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -20,6 +21,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun saleDao(): SaleDao
     abstract fun expenseDao(): ExpenseDao
     abstract fun employeeDao(): EmployeeDao
+    abstract fun userDao(): UserDao
 
     companion object {
         @Volatile

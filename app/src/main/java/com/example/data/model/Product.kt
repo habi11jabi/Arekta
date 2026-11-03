@@ -6,7 +6,8 @@ import androidx.room.PrimaryKey
 enum class ProductStatus {
     IN_STOCK,
     SOLD,
-    RESERVED
+    RESERVED,
+    RETURNED
 }
 
 @Entity(tableName = "products")
@@ -25,5 +26,9 @@ data class Product(
     val imei: String,           // আইএমইআই / বারকোড
     val status: String = ProductStatus.IN_STOCK.name,
     val notes: String = "",     // ওয়ারেন্টি বা বিশেষ নোট
+    val returnReason: String = "",       // রিটার্নের কারণ
+    val returnedAt: Long? = null,        // রিটার্ন করার তারিখ
+    val returnRefundAmount: Double = 0.0,// সাপ্লায়ার থেকে ফেরত প্রাপ্ত অর্থ (যদি থাকে)
+    val returnNotes: String = "",        // রিটার্ন সংক্রান্ত মন্তব্য
     val createdAt: Long = System.currentTimeMillis()
 )

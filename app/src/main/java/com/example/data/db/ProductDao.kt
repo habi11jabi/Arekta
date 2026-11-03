@@ -17,6 +17,9 @@ interface ProductDao {
     @Query("SELECT * FROM products WHERE status = 'IN_STOCK' ORDER BY createdAt DESC")
     fun getInStockProducts(): Flow<List<Product>>
 
+    @Query("SELECT * FROM products WHERE status = 'RETURNED' ORDER BY returnedAt DESC, createdAt DESC")
+    fun getReturnedProducts(): Flow<List<Product>>
+
     @Query("SELECT * FROM products WHERE id = :id LIMIT 1")
     suspend fun getProductById(id: Long): Product?
 

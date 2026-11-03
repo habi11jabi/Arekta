@@ -20,16 +20,21 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Settings
+import com.example.data.model.AppUser
+import com.example.util.GoogleDriveSyncManager
 import com.example.ui.LocalAppStrings
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.VerifiedUser
@@ -77,7 +82,10 @@ fun SettingsScreen(
     onClearAllData: () -> Unit = {},
     onLoadDemoData: () -> Unit = {},
     onOpenGoogleDriveSync: () -> Unit = {},
-    lastSyncTime: Long = 0L
+    lastSyncTime: Long = 0L,
+    currentUser: AppUser? = null,
+    onOpenUserManagement: () -> Unit = {},
+    onLogout: () -> Unit = {}
 ) {
     val strings = LocalAppStrings.current
     var showClearConfirmDialog by remember { mutableStateOf(false) }
@@ -159,6 +167,93 @@ fun SettingsScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(imageVector = Icons.Default.Settings, contentDescription = null, tint = AppleBlue)
+                    }
+                }
+            }
+        }
+
+        // Section: User Account & Staff Management (Conock / Admin)
+        item {
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .background(AppleBlue.copy(alpha = 0.12f), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(imageVector = Icons.Default.Person, contentDescription = null, tint = AppleBlue, modifier = Modifier.size(20.dp))
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = currentUser?.fullName ?: "লগইনকৃত একাউন্ট",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "ইউজারনেম: ${currentUser?.username ?: "Conock"}",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (currentUser?.role == "ADMIN") Color(0xFFDBEAFE) else Color(0xFFF3F4F6)
+                        ) {
+                            Text(
+                                text = if (currentUser?.role == "ADMIN") "এডমিন" else "স্টাফ",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (currentUser?.role == "ADMIN") AppleBlue else Color(0xFF4B5563),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+
+                    if (currentUser?.role == "ADMIN") {
+                        Button(
+                            onClick = onOpenUserManagement,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(44.dp)
+                                .testTag("settings_open_user_management_button"),
+                            colors = ButtonDefaults.buttonColors(containerColor = AppleBlue),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.AdminPanelSettings, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("ইউজার ম্যানেজমেন্ট ও নতুন ইউজার যোগ", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                    }
+
+                    OutlinedButton(
+                        onClick = onLogout,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(42.dp)
+                            .testTag("settings_logout_button"),
+                        shape = RoundedCornerShape(12.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.6f))
+                    ) {
+                        Icon(imageVector = Icons.Default.Logout, contentDescription = "Logout", tint = Color(0xFFEF4444), modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("লগআউট করুন", color = Color(0xFFEF4444), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }

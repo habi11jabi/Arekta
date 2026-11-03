@@ -23,11 +23,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Analytics
+import androidx.compose.material.icons.filled.AssignmentReturn
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.SettingsBackupRestore
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LocalAtm
 import androidx.compose.material.icons.filled.Payments
@@ -88,7 +90,8 @@ fun DashboardScreen(
     onNavigateTab: (AppTab) -> Unit,
     onSellProduct: (Product) -> Unit,
     onEditProduct: (Product) -> Unit,
-    onDeleteProduct: (Product) -> Unit
+    onDeleteProduct: (Product) -> Unit,
+    onReturnProduct: (Product) -> Unit = {}
 ) {
     val strings = LocalAppStrings.current
     val isEnglish = strings.tabDashboard == "Dashboard"
@@ -450,7 +453,8 @@ fun DashboardScreen(
                     product = product,
                     onSellClick = { onSellProduct(product) },
                     onEditClick = { onEditProduct(product) },
-                    onDeleteClick = { onDeleteProduct(product) }
+                    onDeleteClick = { onDeleteProduct(product) },
+                    onReturnClick = { onReturnProduct(product) }
                 )
             }
         }
@@ -528,7 +532,9 @@ fun ProductItemCard(
     product: Product,
     onSellClick: () -> Unit,
     onEditClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onDeleteClick: () -> Unit,
+    onReturnClick: (() -> Unit)? = null,
+    onRestoreClick: (() -> Unit)? = null
 ) {
     val strings = com.example.ui.LocalAppStrings.current
     val isEnglish = strings.tabDashboard == "Dashboard"
@@ -573,13 +579,19 @@ fun ProductItemCard(
                     )
                 }
 
+                val (statusBg, statusTextColor, statusLabel) = when (product.status) {
+                    ProductStatus.IN_STOCK.name -> Triple(Color(0xFFD1FAE5), Color(0xFF065F46), strings.statusInStock)
+                    ProductStatus.RETURNED.name -> Triple(Color(0xFFFEF3C7), Color(0xFFB45309), "রিটার্নড (Returned)")
+                    else -> Triple(Color(0xFFE2E8F0), Color(0xFF475569), strings.statusSold)
+                }
+
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = if (product.status == ProductStatus.IN_STOCK.name) Color(0xFFD1FAE5) else Color(0xFFE2E8F0)
+                    color = statusBg
                 ) {
                     Text(
-                        text = if (product.status == ProductStatus.IN_STOCK.name) strings.statusInStock else strings.statusSold,
-                        color = if (product.status == ProductStatus.IN_STOCK.name) Color(0xFF065F46) else Color(0xFF475569),
+                        text = statusLabel,
+                        color = statusTextColor,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
@@ -655,6 +667,46 @@ fun ProductItemCard(
                 }
             }
 
+            // Return Info Banner (if returned)
+            if (product.status == ProductStatus.RETURNED.name) {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = Color(0xFFFEF3C7),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(imageVector = Icons.Default.AssignmentReturn, contentDescription = "Return", tint = Color(0xFFB45309), modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "রিটার্নের কারণ: ${product.returnReason.ifBlank { "সাধারণ রিটার্ন" }}",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF92400E)
+                            )
+                        }
+                        if (product.returnRefundAmount > 0.0) {
+                            Text(
+                                text = "সাপ্লায়ার থেকে ফেরত অর্থ: ৳ ${InventoryViewModel.formatAmount(product.returnRefundAmount, lang)}",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFF047857)
+                            )
+                        }
+                        if (product.returnNotes.isNotBlank()) {
+                            Text(
+                                text = "নোট: ${product.returnNotes}",
+                                fontSize = 10.sp,
+                                color = Color(0xFF78350F)
+                            )
+                        }
+                    }
+                }
+            }
+
             // Action Buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -675,18 +727,49 @@ fun ProductItemCard(
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(strings.btnSell, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
-                }
 
-                OutlinedButton(
-                    onClick = onEditClick,
-                    modifier = Modifier
-                        .height(40.dp)
-                        .testTag("edit_product_button_${product.id}"),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit", modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(strings.btnEdit, fontSize = 12.sp)
+                    if (onReturnClick != null) {
+                        OutlinedButton(
+                            onClick = onReturnClick,
+                            modifier = Modifier
+                                .height(40.dp)
+                                .testTag("return_product_button_${product.id}"),
+                            shape = RoundedCornerShape(10.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD97706))
+                        ) {
+                            Icon(imageVector = Icons.Default.AssignmentReturn, contentDescription = "Return", tint = Color(0xFFD97706), modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("রিটার্ন", fontSize = 12.sp, color = Color(0xFFD97706), fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+
+                    OutlinedButton(
+                        onClick = onEditClick,
+                        modifier = Modifier
+                            .height(40.dp)
+                            .testTag("edit_product_button_${product.id}"),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit", modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(strings.btnEdit, fontSize = 12.sp)
+                    }
+                } else if (product.status == ProductStatus.RETURNED.name) {
+                    if (onRestoreClick != null) {
+                        Button(
+                            onClick = onRestoreClick,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(40.dp)
+                                .testTag("restore_product_button_${product.id}"),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F766E)),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.SettingsBackupRestore, contentDescription = "Restore", modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("পুনরায় স্টকে নিন", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
 
                 IconButton(

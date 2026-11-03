@@ -72,7 +72,11 @@ fun StockScreen(
     onOpenScanner: () -> Unit,
     onSellProduct: (Product) -> Unit,
     onEditProduct: (Product) -> Unit,
-    onDeleteProduct: (Product) -> Unit
+    onDeleteProduct: (Product) -> Unit,
+    onReturnProduct: (Product) -> Unit = {},
+    onRestoreProduct: (Product) -> Unit = {},
+    selectedStatusFilter: String = "IN_STOCK",
+    onStatusFilterChange: (String) -> Unit = {}
 ) {
     val strings = com.example.ui.LocalAppStrings.current
     val isEnglish = strings.tabDashboard == "Dashboard"
@@ -272,6 +276,32 @@ fun StockScreen(
                 }
             }
 
+            // Status Filter Chips (স্টক vs রিটার্নড)
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val statusOptions = listOf(
+                        "IN_STOCK" to if (isEnglish) "In Stock" else "স্টকে সক্রিয়",
+                        "RETURNED" to if (isEnglish) "Returned" else "রিটার্নড ডিভাইস",
+                        "ALL" to if (isEnglish) "All" else "সকল পণ্য"
+                    )
+                    statusOptions.forEach { (key, label) ->
+                        val isSelected = selectedStatusFilter == key
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { onStatusFilterChange(key) },
+                            label = { Text(label, fontSize = 11.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = if (key == "RETURNED") Color(0xFFD97706) else AppleBlue,
+                                selectedLabelColor = Color.White
+                            )
+                        )
+                    }
+                }
+            }
+
             // Brand Chips
             item {
                 LazyRow(
@@ -365,7 +395,9 @@ fun StockScreen(
                         product = product,
                         onSellClick = { onSellProduct(product) },
                         onEditClick = { onEditProduct(product) },
-                        onDeleteClick = { onDeleteProduct(product) }
+                        onDeleteClick = { onDeleteProduct(product) },
+                        onReturnClick = { onReturnProduct(product) },
+                        onRestoreClick = { onRestoreProduct(product) }
                     )
                 }
             }

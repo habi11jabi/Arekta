@@ -52,11 +52,14 @@ import com.example.ui.screens.EditSaleDialog
 import com.example.ui.screens.EmployeeScreen
 import com.example.ui.screens.ExpenseScreen
 import com.example.ui.screens.InvoiceMemoDialog
+import com.example.ui.screens.LoginScreen
 import com.example.ui.screens.ReportsScreen
+import com.example.ui.screens.ReturnProductDialog
 import com.example.ui.screens.SaleCheckoutDialog
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.StockScreen
 import com.example.ui.screens.SalesScreen
+import com.example.ui.screens.UserManagementDialog
 import com.example.ui.theme.AppleBlue
 import com.example.ui.theme.MyApplicationTheme
 import com.example.viewmodel.AppTab
@@ -70,7 +73,12 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MyApplicationTheme {
-                MainAppContent(viewModel = viewModel)
+                val isLoggedIn by viewModel.isLoggedIn.collectAsStateWithLifecycle()
+                if (!isLoggedIn) {
+                    LoginScreen(viewModel = viewModel)
+                } else {
+                    MainAppContent(viewModel = viewModel)
+                }
             }
         }
     }
@@ -102,6 +110,11 @@ fun MainAppContent(viewModel: InventoryViewModel) {
     val expenseFilterPeriod by viewModel.expenseFilterPeriod.collectAsStateWithLifecycle()
     val allEmployees by viewModel.allEmployees.collectAsStateWithLifecycle()
     val allSalaryPayments by viewModel.allSalaryPayments.collectAsStateWithLifecycle()
+
+    val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
+    val productToReturn by viewModel.productToReturn.collectAsStateWithLifecycle()
+    val isUserManagementOpen by viewModel.isUserManagementOpen.collectAsStateWithLifecycle()
+    val allUsers by viewModel.allUsers.collectAsStateWithLifecycle()
 
     val isBatchMode by viewModel.isBatchMode.collectAsStateWithLifecycle()
     val isDriveSyncing by viewModel.isDriveSyncing.collectAsStateWithLifecycle()
@@ -207,6 +220,32 @@ fun MainAppContent(viewModel: InventoryViewModel) {
                 onDismiss = { viewModel.closeDuePayment() },
                 onPaymentConfirmed = { additionalPaid ->
                     viewModel.recordDuePayment(sale, additionalPaid)
+                }
+            )
+        }
+
+        // 6. Return Product Dialog
+        productToReturn?.let { product ->
+            ReturnProductDialog(
+                product = product,
+                onDismiss = { viewModel.closeReturnProduct() },
+                onConfirmReturn = { productId, reason, refundAmount, notes ->
+                    viewModel.confirmReturnProduct(productId, reason, refundAmount, notes)
+                }
+            )
+        }
+
+        // 7. User Management Dialog (Admin)
+        if (isUserManagementOpen) {
+            UserManagementDialog(
+                users = allUsers,
+                currentUser = currentUser,
+                onDismiss = { viewModel.closeUserManagement() },
+                onAddUser = { fullName, username, password, role, phone ->
+                    viewModel.addUser(fullName, username, password, role, phone)
+                },
+                onDeleteUser = { user ->
+                    viewModel.deleteUser(user)
                 }
             )
         }
@@ -355,7 +394,8 @@ fun MainAppContent(viewModel: InventoryViewModel) {
                         onNavigateTab = { viewModel.setTab(it) },
                         onSellProduct = { viewModel.openSaleCheckout(it) },
                         onEditProduct = { viewModel.openEditProduct(it) },
-                        onDeleteProduct = { viewModel.deleteProduct(it) }
+                        onDeleteProduct = { viewModel.deleteProduct(it) },
+                        onReturnProduct = { viewModel.openReturnProduct(it) }
                     )
                     AppTab.STOCK -> StockScreen(
                         products = filteredProducts,
@@ -370,7 +410,11 @@ fun MainAppContent(viewModel: InventoryViewModel) {
                         onOpenScanner = { viewModel.openScanner() },
                         onSellProduct = { viewModel.openSaleCheckout(it) },
                         onEditProduct = { viewModel.openEditProduct(it) },
-                        onDeleteProduct = { viewModel.deleteProduct(it) }
+                        onDeleteProduct = { viewModel.deleteProduct(it) },
+                        onReturnProduct = { viewModel.openReturnProduct(it) },
+                        onRestoreProduct = { viewModel.restoreReturnedProductToStock(it) },
+                        selectedStatusFilter = selectedStatusFilter,
+                        onStatusFilterChange = { viewModel.setStatusFilter(it) }
                     )
                     AppTab.EXPENSES -> ExpenseScreen(
                         expenses = filteredExpenses,
@@ -414,7 +458,10 @@ fun MainAppContent(viewModel: InventoryViewModel) {
                         onClearAllData = { viewModel.clearAllDatabaseData() },
                         onLoadDemoData = { viewModel.loadDemoData() },
                         onOpenGoogleDriveSync = { showDriveSyncDialog = true },
-                        lastSyncTime = lastDriveSyncTime
+                        lastSyncTime = lastDriveSyncTime,
+                        currentUser = currentUser,
+                        onOpenUserManagement = { viewModel.openUserManagement() },
+                        onLogout = { viewModel.logout() }
                     )
                 }
             }

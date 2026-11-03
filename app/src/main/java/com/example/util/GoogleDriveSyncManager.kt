@@ -18,6 +18,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+import com.example.data.model.AppUser
+
 data class SyncResult(
     val success: Boolean,
     val message: String,
@@ -48,7 +50,7 @@ object GoogleDriveSyncManager {
     }
 
     /**
-     * Serializes all app data (Products, Sales, Expenses, Employees, SalaryPayments, Settings)
+     * Serializes all app data (Products, Sales, Expenses, Employees, SalaryPayments, Users, Settings)
      * into a JSON string for Google Drive synchronization.
      */
     fun createFullBackupJson(
@@ -57,6 +59,7 @@ object GoogleDriveSyncManager {
         expenses: List<Expense>,
         employees: List<Employee>,
         salaryPayments: List<SalaryPayment>,
+        users: List<AppUser> = emptyList(),
         settings: ShopSettings
     ): String {
         val root = JSONObject()
@@ -101,6 +104,10 @@ object GoogleDriveSyncManager {
                 put("imei", p.imei)
                 put("notes", p.notes)
                 put("status", p.status)
+                put("returnReason", p.returnReason)
+                put("returnedAt", p.returnedAt ?: 0L)
+                put("returnRefundAmount", p.returnRefundAmount)
+                put("returnNotes", p.returnNotes)
                 put("createdAt", p.createdAt)
             }
             productsArr.put(obj)
@@ -188,7 +195,41 @@ object GoogleDriveSyncManager {
         }
         root.put("salaryPayments", salaryArr)
 
+        // Users
+        val usersArr = JSONArray()
+        users.forEach { u ->
+            val obj = JSONObject().apply {
+                put("id", u.id)
+                put("username", u.username)
+                put("password", u.password)
+                put("fullName", u.fullName)
+                put("role", u.role)
+                put("phone", u.phone)
+                put("isActive", u.isActive)
+                put("createdAt", u.createdAt)
+            }
+            usersArr.put(obj)
+        }
+        root.put("users", usersArr)
+
         return root.toString(2)
+    }
+
+    /**
+     * Automatically saves a persistent cloud-syncable snapshot to internal app storage.
+     */
+    fun saveAutoBackupSnapshot(context: Context, backupJson: String): Boolean {
+        return try {
+            val file = File(context.filesDir, "apple_area_bd_auto_backup.json")
+            FileOutputStream(file).use { out ->
+                out.write(backupJson.toByteArray(Charsets.UTF_8))
+            }
+            saveLastSyncTime(context)
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
     }
 
     /**
@@ -272,6 +313,10 @@ object GoogleDriveSyncManager {
                             imei = p.optString("imei", ""),
                             notes = p.optString("notes", ""),
                             status = p.optString("status", "IN_STOCK"),
+                            returnReason = p.optString("returnReason", ""),
+                            returnedAt = if (p.has("returnedAt") && p.optLong("returnedAt", 0L) > 0L) p.optLong("returnedAt") else null,
+                            returnRefundAmount = p.optDouble("returnRefundAmount", 0.0),
+                            returnNotes = p.optString("returnNotes", ""),
                             createdAt = p.optLong("createdAt", System.currentTimeMillis())
                         )
                     )
@@ -371,13 +416,34 @@ object GoogleDriveSyncManager {
                 }
             }
 
+            // Users
+            val users = mutableListOf<AppUser>()
+            val usersArr = root.optJSONArray("users")
+            if (usersArr != null) {
+                for (i in 0 until usersArr.length()) {
+                    val u = usersArr.getJSONObject(i)
+                    users.add(
+                        AppUser(
+                            username = u.optString("username", ""),
+                            password = u.optString("password", ""),
+                            fullName = u.optString("fullName", ""),
+                            role = u.optString("role", "STAFF"),
+                            phone = u.optString("phone", ""),
+                            isActive = u.optBoolean("isActive", true),
+                            createdAt = u.optLong("createdAt", System.currentTimeMillis())
+                        )
+                    )
+                }
+            }
+
             ParsedBackupData(
                 shopSettings = shopSettings,
                 products = products,
                 sales = sales,
                 expenses = expenses,
                 employees = employees,
-                salaryPayments = salaryPayments
+                salaryPayments = salaryPayments,
+                users = users
             )
         } catch (e: Exception) {
             e.printStackTrace()
@@ -392,5 +458,6 @@ data class ParsedBackupData(
     val sales: List<Sale>,
     val expenses: List<Expense>,
     val employees: List<Employee>,
-    val salaryPayments: List<SalaryPayment>
+    val salaryPayments: List<SalaryPayment>,
+    val users: List<AppUser> = emptyList()
 )

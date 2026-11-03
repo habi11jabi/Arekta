@@ -12,6 +12,8 @@ import com.example.data.model.ProductStatus
 import com.example.data.model.SalaryPayment
 import com.example.data.model.Sale
 import com.example.data.model.TransactionType
+import com.example.data.db.UserDao
+import com.example.data.model.AppUser
 import kotlinx.coroutines.flow.Flow
 
 class InventoryRepository(
@@ -19,18 +21,21 @@ class InventoryRepository(
     private val productDao: ProductDao,
     private val saleDao: SaleDao,
     private val expenseDao: ExpenseDao,
-    private val employeeDao: EmployeeDao
+    private val employeeDao: EmployeeDao,
+    private val userDao: UserDao
 ) {
     private val prefs = context.getSharedPreferences("apple_area_bd_prefs", Context.MODE_PRIVATE)
 
     // Flow streams
     val allProducts: Flow<List<Product>> = productDao.getAllProducts()
     val inStockProducts: Flow<List<Product>> = productDao.getInStockProducts()
+    val returnedProducts: Flow<List<Product>> = productDao.getReturnedProducts()
     val allSales: Flow<List<Sale>> = saleDao.getAllSales()
     val allExpenses: Flow<List<Expense>> = expenseDao.getAllExpenses()
     val allEmployees: Flow<List<Employee>> = employeeDao.getAllEmployees()
     val activeEmployees: Flow<List<Employee>> = employeeDao.getActiveEmployees()
     val allSalaryPayments: Flow<List<SalaryPayment>> = employeeDao.getAllSalaryPayments()
+    val allUsers: Flow<List<AppUser>> = userDao.getAllUsers()
 
     // Product methods
     suspend fun addProduct(product: Product): Long = productDao.insertProduct(product)
@@ -39,6 +44,75 @@ class InventoryRepository(
     suspend fun deleteProduct(product: Product) = productDao.deleteProduct(product)
     suspend fun getProductById(id: Long): Product? = productDao.getProductById(id)
     suspend fun getProductByImei(imei: String): Product? = productDao.getProductByImei(imei)
+
+    /**
+     * Returns a product from stock with reason and records refund from supplier if any.
+     */
+    suspend fun returnProduct(
+        productId: Long,
+        reason: String,
+        refundAmount: Double = 0.0,
+        notes: String = ""
+    ) {
+        val product = productDao.getProductById(productId) ?: return
+        val updatedProduct = product.copy(
+            status = ProductStatus.RETURNED.name,
+            returnReason = reason,
+            returnedAt = System.currentTimeMillis(),
+            returnRefundAmount = refundAmount,
+            returnNotes = notes
+        )
+        productDao.updateProduct(updatedProduct)
+
+        // If refund amount is received from supplier, record as Income
+        if (refundAmount > 0.0) {
+            val income = Expense(
+                type = TransactionType.INCOME.name,
+                category = "সাপ্লায়ার রিটার্ন রিফান্ড",
+                amount = refundAmount,
+                note = "রিটার্ন: ${product.model} (${product.imei}) - $reason",
+                dateMillis = System.currentTimeMillis(),
+                paymentMethod = "Cash",
+                referenceId = "RETURN_$productId"
+            )
+            expenseDao.insertExpense(income)
+        }
+    }
+
+    // User Authentication & Management methods
+    suspend fun authenticate(username: String, password: String): AppUser? {
+        return userDao.authenticate(username.trim(), password.trim())
+    }
+
+    suspend fun getUserByUsername(username: String): AppUser? {
+        return userDao.getUserByUsername(username.trim())
+    }
+
+    suspend fun addUser(user: AppUser): Long {
+        return userDao.insertUser(user)
+    }
+
+    suspend fun updateUser(user: AppUser) {
+        userDao.updateUser(user)
+    }
+
+    suspend fun deleteUser(user: AppUser) {
+        userDao.deleteUser(user)
+    }
+
+    suspend fun seedAdminUserIfEmpty() {
+        if (userDao.getUserCount() == 0) {
+            val adminUser = AppUser(
+                username = "Conock",
+                password = "1219",
+                fullName = "Conock (Admin)",
+                role = "ADMIN",
+                phone = "01930833375",
+                isActive = true
+            )
+            userDao.insertUser(adminUser)
+        }
+    }
 
     /**
      * Completes a sale transaction: marks product as SOLD and inserts the Sale record.
@@ -400,10 +474,13 @@ class InventoryRepository(
         expenseDao.deleteAllExpenses()
         employeeDao.deleteAllEmployees()
         employeeDao.deleteAllSalaryPayments()
+        // Do not delete admin user so user can still log in
+        seedAdminUserIfEmpty()
         prefs.edit().putBoolean("has_seeded_initial_data_v2", true).apply()
     }
 
     suspend fun seedDemoData() {
+        seedAdminUserIfEmpty()
         seedInitialDataIfEmpty(force = true)
     }
 
@@ -412,7 +489,8 @@ class InventoryRepository(
         sales: List<Sale>,
         expenses: List<Expense>,
         employees: List<Employee>,
-        salaryPayments: List<SalaryPayment>
+        salaryPayments: List<SalaryPayment>,
+        users: List<AppUser> = emptyList()
     ) {
         productDao.deleteAllProducts()
         saleDao.deleteAllSales()
@@ -427,6 +505,10 @@ class InventoryRepository(
         if (expenses.isNotEmpty()) expenseDao.insertAll(expenses)
         if (employees.isNotEmpty()) employeeDao.insertEmployees(employees)
         if (salaryPayments.isNotEmpty()) employeeDao.insertSalaryPayments(salaryPayments)
+        if (users.isNotEmpty()) {
+            userDao.insertAll(users)
+        }
+        seedAdminUserIfEmpty()
         prefs.edit().putBoolean("has_seeded_initial_data_v2", true).apply()
     }
 }

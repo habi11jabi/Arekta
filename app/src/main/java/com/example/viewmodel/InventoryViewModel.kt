@@ -17,6 +17,8 @@ import com.example.data.repository.InventoryRepository
 import com.example.data.repository.SettingsManager
 import com.example.util.GoogleDriveSyncManager
 import com.example.util.ParsedBackupData
+import com.example.data.model.AppUser
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -81,7 +83,21 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
     val allExpenses: StateFlow<List<Expense>>
     val allEmployees: StateFlow<List<Employee>>
     val allSalaryPayments: StateFlow<List<SalaryPayment>>
+    val allUsers: StateFlow<List<AppUser>>
+    val returnedProducts: StateFlow<List<Product>>
     val shopSettings: StateFlow<ShopSettings> = settingsManager.settings
+
+    // Authentication & User Session State
+    private val loginPrefs = application.getSharedPreferences("apple_area_bd_login_prefs", Context.MODE_PRIVATE)
+
+    private val _isLoggedIn = MutableStateFlow(false)
+    val isLoggedIn: StateFlow<Boolean> = _isLoggedIn.asStateFlow()
+
+    private val _currentUser = MutableStateFlow<AppUser?>(null)
+    val currentUser: StateFlow<AppUser?> = _currentUser.asStateFlow()
+
+    private val _loginError = MutableStateFlow<String?>(null)
+    val loginError: StateFlow<String?> = _loginError.asStateFlow()
 
     // Navigation Tab
     private val _currentTab = MutableStateFlow(AppTab.DASHBOARD)
@@ -91,7 +107,7 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    private val _selectedStatusFilter = MutableStateFlow("ALL")
+    private val _selectedStatusFilter = MutableStateFlow("IN_STOCK")
     val selectedStatusFilter: StateFlow<String> = _selectedStatusFilter.asStateFlow()
 
     private val _selectedBrandFilter = MutableStateFlow("ALL")
@@ -110,6 +126,14 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val _editingProduct = MutableStateFlow<Product?>(null)
     val editingProduct: StateFlow<Product?> = _editingProduct.asStateFlow()
+
+    // Product Return Dialog State
+    private val _productToReturn = MutableStateFlow<Product?>(null)
+    val productToReturn: StateFlow<Product?> = _productToReturn.asStateFlow()
+
+    // User Management Dialog State (for Admin)
+    private val _isUserManagementOpen = MutableStateFlow(false)
+    val isUserManagementOpen: StateFlow<Boolean> = _isUserManagementOpen.asStateFlow()
 
     // Google Drive Sync State
     private val _isDriveSyncing = MutableStateFlow(false)
@@ -153,10 +177,17 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
             db.productDao(),
             db.saleDao(),
             db.expenseDao(),
-            db.employeeDao()
+            db.employeeDao(),
+            db.userDao()
         )
 
         allProducts = repository.allProducts.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+        returnedProducts = repository.returnedProducts.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
@@ -186,19 +217,42 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
             initialValue = emptyList()
         )
 
+        allUsers = repository.allUsers.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
         viewModelScope.launch {
+            repository.seedAdminUserIfEmpty()
             repository.seedInitialDataIfEmpty()
+
+            // Restore login session if remembered
+            val savedUser = loginPrefs.getString("logged_in_username", null)
+            if (!savedUser.isNullOrBlank()) {
+                val user = repository.getUserByUsername(savedUser)
+                if (user != null && user.isActive) {
+                    _currentUser.value = user
+                    _isLoggedIn.value = true
+                }
+            }
         }
     }
 
-    // Filtered Products (Stock page only shows active in-stock products)
+    // Filtered Products (Supports In-Stock, Returned, and All with Search & Brand filter)
     val filteredProducts: StateFlow<List<Product>> = combine(
         allProducts,
         _searchQuery,
-        _selectedBrandFilter
-    ) { products, query, brand ->
+        _selectedBrandFilter,
+        _selectedStatusFilter
+    ) { products, query, brand, statusFilter ->
         products.filter { product ->
-            val isInStock = product.status == ProductStatus.IN_STOCK.name
+            val matchesStatus = when (statusFilter) {
+                "IN_STOCK" -> product.status == ProductStatus.IN_STOCK.name
+                "RETURNED" -> product.status == ProductStatus.RETURNED.name
+                "ALL" -> product.status != ProductStatus.SOLD.name
+                else -> product.status == statusFilter
+            }
             val matchesQuery = query.isBlank() ||
                     product.model.contains(query, ignoreCase = true) ||
                     product.company.contains(query, ignoreCase = true) ||
@@ -209,7 +263,7 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
 
             val matchesBrand = if (brand == "ALL") true else product.company.equals(brand, ignoreCase = true)
 
-            isInStock && matchesQuery && matchesBrand
+            matchesStatus && matchesQuery && matchesBrand
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -533,6 +587,7 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                     notes = notes.trim()
                 )
                 repository.updateProduct(updated)
+                triggerAutoCloudBackup()
                 _snackbarMessage.value = "${updated.model} আপডেট করা হয়েছে!"
             } else {
                 val newProduct = Product(
@@ -550,6 +605,7 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                     status = ProductStatus.IN_STOCK.name
                 )
                 repository.addProduct(newProduct)
+                triggerAutoCloudBackup()
                 _snackbarMessage.value = "${newProduct.model} স্টকে সফলভাবে যুক্ত হয়েছে!"
             }
             closeAddEdit()
@@ -587,6 +643,7 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                 )
             }
             repository.addProducts(products)
+            triggerAutoCloudBackup()
             _snackbarMessage.value = "একসাথে ${products.size}টি $model সফলভাবে স্টকে যুক্ত হয়েছে!"
             closeAddEdit()
         }
@@ -595,6 +652,7 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
     fun deleteProduct(product: Product) {
         viewModelScope.launch {
             repository.deleteProduct(product)
+            triggerAutoCloudBackup()
             _snackbarMessage.value = "${product.model} মুছে ফেলা হয়েছে।"
         }
     }
@@ -655,6 +713,7 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                 remarks = remarks
             )
             _activeInvoiceSale.value = sale
+            triggerAutoCloudBackup()
         }
     }
 
@@ -850,7 +909,7 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    // Google Drive Synchronization
+    // Google Drive Synchronization & Automated Cloud Backup
     fun getFullBackupJson(): String {
         return GoogleDriveSyncManager.createFullBackupJson(
             products = allProducts.value,
@@ -858,8 +917,24 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
             expenses = allExpenses.value,
             employees = allEmployees.value,
             salaryPayments = allSalaryPayments.value,
+            users = allUsers.value,
             settings = shopSettings.value
         )
+    }
+
+    /**
+     * Automatically saves a complete snapshot of all shop data in the background.
+     */
+    fun triggerAutoCloudBackup() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val json = getFullBackupJson()
+                GoogleDriveSyncManager.saveAutoBackupSnapshot(getApplication(), json)
+                _lastDriveSyncTime.value = System.currentTimeMillis()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 
     fun syncAllDataToGoogleDrive(context: Context) {
@@ -885,12 +960,150 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                 sales = backupData.sales,
                 expenses = backupData.expenses,
                 employees = backupData.employees,
-                salaryPayments = backupData.salaryPayments
+                salaryPayments = backupData.salaryPayments,
+                users = backupData.users
             )
             backupData.shopSettings?.let {
                 settingsManager.saveSettings(it)
             }
+            triggerAutoCloudBackup()
             _snackbarMessage.value = "গুগল ড্রাইভ ব্যাকআপ থেকে ${backupData.products.size}টি প্রোডাক্ট ও সকল ডাটা সফলভাবে রিস্টোর হয়েছে!"
+        }
+    }
+
+    // Product Return Management (স্টক লিস্ট থেকে প্রোডাক্ট রিটার্ন)
+    fun openReturnProduct(product: Product) {
+        _productToReturn.value = product
+    }
+
+    fun closeReturnProduct() {
+        _productToReturn.value = null
+    }
+
+    fun confirmReturnProduct(
+        productId: Long,
+        reason: String,
+        refundAmount: Double = 0.0,
+        notes: String = ""
+    ) {
+        viewModelScope.launch {
+            repository.returnProduct(productId, reason, refundAmount, notes)
+            closeReturnProduct()
+            triggerAutoCloudBackup()
+            _snackbarMessage.value = "প্রোডাক্টটি সফলভাবে রিটার্ন হিসেবে রেকর্ড করা হয়েছে!"
+        }
+    }
+
+    fun restoreReturnedProductToStock(product: Product) {
+        viewModelScope.launch {
+            val restored = product.copy(
+                status = ProductStatus.IN_STOCK.name,
+                returnReason = "",
+                returnedAt = null,
+                returnRefundAmount = 0.0,
+                returnNotes = ""
+            )
+            repository.updateProduct(restored)
+            triggerAutoCloudBackup()
+            _snackbarMessage.value = "${product.model} পুনরায় স্টকে সক্রিয় করা হয়েছে!"
+        }
+    }
+
+    // User Authentication & Management (Conock / 1219 default admin)
+    fun login(username: String, password: String, onResult: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            _loginError.value = null
+            val trimmedUser = username.trim()
+            val trimmedPass = password.trim()
+            if (trimmedUser.isBlank() || trimmedPass.isBlank()) {
+                _loginError.value = "ইউজার নেম ও পাসওয়ার্ড উভয়ই লিখুন।"
+                onResult(false)
+                return@launch
+            }
+            val user = repository.authenticate(trimmedUser, trimmedPass)
+            if (user != null) {
+                _currentUser.value = user
+                _isLoggedIn.value = true
+                loginPrefs.edit().putString("logged_in_username", user.username).apply()
+                _snackbarMessage.value = "স্বাগতম, ${user.fullName}!"
+                onResult(true)
+            } else {
+                _loginError.value = "ভুল ইউজার নেম বা পাসওয়ার্ড! পুনরায় চেক করুন।"
+                onResult(false)
+            }
+        }
+    }
+
+    fun logout() {
+        loginPrefs.edit().remove("logged_in_username").apply()
+        _currentUser.value = null
+        _isLoggedIn.value = false
+        _snackbarMessage.value = "লগআউট সফল হয়েছে।"
+    }
+
+    fun clearLoginError() {
+        _loginError.value = null
+    }
+
+    fun openUserManagement() {
+        _isUserManagementOpen.value = true
+    }
+
+    fun closeUserManagement() {
+        _isUserManagementOpen.value = false
+    }
+
+    fun addUser(fullName: String, username: String, password: String, role: String, phone: String) {
+        viewModelScope.launch {
+            val trimmedUser = username.trim()
+            val trimmedPass = password.trim()
+            val trimmedName = fullName.trim()
+
+            if (trimmedUser.isBlank() || trimmedPass.isBlank() || trimmedName.isBlank()) {
+                _snackbarMessage.value = "ইউজার তৈরির জন্য নাম, ইউজারনেম ও পাসওয়ার্ড আবশ্যক।"
+                return@launch
+            }
+
+            val existing = repository.getUserByUsername(trimmedUser)
+            if (existing != null) {
+                _snackbarMessage.value = "ইউজারনেম '$trimmedUser' ইতিমধ্যে ব্যবহৃত হয়েছে।"
+                return@launch
+            }
+
+            val newUser = AppUser(
+                username = trimmedUser,
+                password = trimmedPass,
+                fullName = trimmedName,
+                role = role,
+                phone = phone.trim()
+            )
+            repository.addUser(newUser)
+            triggerAutoCloudBackup()
+            _snackbarMessage.value = "নতুন ইউজার '$trimmedName' সফলভাবে তৈরি হয়েছে!"
+        }
+    }
+
+    fun updateUser(user: AppUser) {
+        viewModelScope.launch {
+            repository.updateUser(user)
+            triggerAutoCloudBackup()
+            _snackbarMessage.value = "ইউজার '${user.fullName}' আপডেট করা হয়েছে।"
+        }
+    }
+
+    fun deleteUser(user: AppUser) {
+        viewModelScope.launch {
+            if (user.username.equals("Conock", ignoreCase = true)) {
+                _snackbarMessage.value = "মূল এডমিন ইউজার মুছে ফেলা সম্ভব নয়!"
+                return@launch
+            }
+            if (_currentUser.value?.id == user.id) {
+                _snackbarMessage.value = "বর্তমান লগইন করা একাউন্ট মুছে ফেলা যাবে না!"
+                return@launch
+            }
+            repository.deleteUser(user)
+            triggerAutoCloudBackup()
+            _snackbarMessage.value = "ইউজার '${user.fullName}' সফলভাবে ডিলিট করা হয়েছে।"
         }
     }
 
