@@ -138,7 +138,7 @@ object PdfInvoiceGenerator {
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         paint.color = Color.parseColor("#0284C7")
         paint.textSize = 10.5f
-        canvas.drawText("[ ক্রেতার তথ্য / Customer Info ]", 54f, 200f, paint)
+        canvas.drawText("ক্রেতার তথ্য / Customer Info", 54f, 200f, paint)
 
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
         paint.color = Color.parseColor("#1E293B")
@@ -146,7 +146,11 @@ object PdfInvoiceGenerator {
         canvas.drawText("নাম: ${sale.customerName}", 54f, 218f, paint)
         canvas.drawText("মোবাইল: ${sale.customerPhone}", 54f, 234f, paint)
         if (sale.customerAddress.isNotBlank()) {
-            canvas.drawText("ঠিকানা: ${sale.customerAddress}", 320f, 218f, paint)
+            paint.textAlign = Paint.Align.RIGHT
+            val addressText = "ঠিকানা: ${sale.customerAddress}"
+            val truncatedAddress = if (addressText.length > 40) addressText.take(37) + "..." else addressText
+            canvas.drawText(truncatedAddress, (PAGE_WIDTH - 54).toFloat(), 234f, paint)
+            paint.textAlign = Paint.Align.LEFT
         }
 
         // Product Details Section Box
@@ -162,7 +166,7 @@ object PdfInvoiceGenerator {
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         paint.color = Color.parseColor("#0284C7")
         paint.textSize = 10.5f
-        canvas.drawText("[ পণ্যের বিবরণ / Device Details ]", 54f, 278f, paint)
+        canvas.drawText("পণ্যের বিবরণ / Device Details", 54f, 278f, paint)
 
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         paint.color = Color.parseColor("#0F172A")
@@ -240,7 +244,7 @@ object PdfInvoiceGenerator {
         paint.color = Color.parseColor("#A16207")
         paint.textSize = 10.5f
         paint.textAlign = Paint.Align.LEFT
-        canvas.drawText("[ অফিসিয়াল ওয়ারেন্টি ও গ্যারান্টি নীতিমালা / Warranty Policy ]", 54f, 504f, paint)
+        canvas.drawText("অফিসিয়াল ওয়ারেন্টি ও গ্যারান্টি নীতিমালা / Warranty Policy", 54f, 504f, paint)
 
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
         paint.color = Color.parseColor("#451A03")
@@ -265,19 +269,33 @@ object PdfInvoiceGenerator {
         // Signature lines
         paint.strokeWidth = 1f
         paint.color = Color.parseColor("#94A3B8")
-        canvas.drawLine(54f, 730f, 180f, 730f, paint)
-        canvas.drawLine((PAGE_WIDTH - 180).toFloat(), 730f, (PAGE_WIDTH - 54).toFloat(), 730f, paint)
+        canvas.drawLine(54f, 725f, 180f, 725f, paint)
+        canvas.drawLine((PAGE_WIDTH - 180).toFloat(), 725f, (PAGE_WIDTH - 54).toFloat(), 725f, paint)
 
         paint.textAlign = Paint.Align.CENTER
         paint.textSize = 9.5f
         paint.color = Color.parseColor("#334155")
-        canvas.drawText("ক্রেতার স্বাক্ষর", 117f, 746f, paint)
-        canvas.drawText("কর্তৃপক্ষের স্বাক্ষর ও সিল", (PAGE_WIDTH - 117).toFloat(), 746f, paint)
+        canvas.drawText("ক্রেতার স্বাক্ষর", 117f, 742f, paint)
+        canvas.drawText("কর্তৃপক্ষের স্বাক্ষর ও সিল", (PAGE_WIDTH - 117).toFloat(), 742f, paint)
+
+        // Shop QR Code placed in bottom center, directly above the tagline
+        try {
+            val qrDrawable = androidx.core.content.ContextCompat.getDrawable(context, com.example.R.drawable.shop_qr_code)
+            if (qrDrawable != null) {
+                val qrSize = 56
+                val qrLeft = (PAGE_WIDTH - qrSize) / 2
+                val qrTop = 728
+                qrDrawable.setBounds(qrLeft, qrTop, qrLeft + qrSize, qrTop + qrSize)
+                qrDrawable.draw(canvas)
+            }
+        } catch (_: Exception) {}
 
         // Footer brand tagline
+        paint.textAlign = Paint.Align.CENTER
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
         paint.textSize = 8.5f
         paint.color = Color.parseColor("#94A3B8")
-        canvas.drawText("${shopSettings.shopName} • ${shopSettings.shopTagline}", (PAGE_WIDTH / 2).toFloat(), 795f, paint)
+        canvas.drawText("${shopSettings.shopName} • ${shopSettings.shopTagline}", (PAGE_WIDTH / 2).toFloat(), 802f, paint)
     }
     /**
      * Saves the PDF to user's device Downloads directory and offers immediate viewing.

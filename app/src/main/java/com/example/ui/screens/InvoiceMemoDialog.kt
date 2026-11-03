@@ -94,12 +94,12 @@ fun InvoiceMemoDialog(
 ${strings.invoiceNoLabel}: #${sale.invoiceNumber}
 ${strings.dateLabel}: $formattedDate
 
-[${strings.customerInfoSection}]
+${strings.customerInfoSection}
 ${if (isEnglish) "Name:" else "নাম:"} ${sale.customerName}
 ${if (isEnglish) "Phone:" else "মোবাইল:"} ${sale.customerPhone}
 ${if (sale.customerAddress.isNotBlank()) "${if (isEnglish) "Address:" else "ঠিকানা:"} ${sale.customerAddress}" else ""}
 
-[${strings.productDetailsSection}]
+${strings.productDetailsSection}
 ${if (isEnglish) "Device:" else "প্রোডাক্ট:"} ${sale.productDetails}
 ${strings.imeiLabel} ${sale.imei}
 ${if (sale.batteryHealth.isNotBlank()) "${strings.batteryLabel} ${sale.batteryHealth}" else ""}
@@ -252,7 +252,7 @@ ${shopSettings.shopName} • ${shopSettings.shopPhone}
                         HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
                         // Customer Details
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text(
                                 text = strings.customerInfoSection,
                                 fontSize = 11.sp,
@@ -264,17 +264,25 @@ ${shopSettings.shopName} • ${shopSettings.shopPhone}
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold
                             )
-                            Text(
-                                text = "${if (isEnglish) "Phone:" else "মোবাইল:"} ${sale.customerPhone}",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            if (sale.customerAddress.isNotBlank()) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Text(
-                                    text = "${if (isEnglish) "Address:" else "ঠিকানা:"} ${sale.customerAddress}",
-                                    fontSize = 11.sp,
+                                    text = "${if (isEnglish) "Phone:" else "মোবাইল:"} ${sale.customerPhone}",
+                                    fontSize = 12.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
+                                if (sale.customerAddress.isNotBlank()) {
+                                    Text(
+                                        text = "${if (isEnglish) "Address:" else "ঠিকানা:"} ${sale.customerAddress}",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        textAlign = TextAlign.End,
+                                        modifier = Modifier.padding(start = 8.dp)
+                                    )
+                                }
                             }
                         }
 
@@ -464,6 +472,33 @@ ${shopSettings.shopName} • ${shopSettings.shopPhone}
                                     color = AppleBlue
                                 )
                             }
+                        }
+
+                        HorizontalDivider(modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+
+                        // Bottom Center QR Code and Shop Tagline
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Image(
+                                painter = painterResource(id = R.drawable.shop_qr_code),
+                                contentDescription = "Shop QR Code",
+                                modifier = Modifier
+                                    .size(72.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(8.dp))
+                                    .background(Color.White)
+                                    .padding(4.dp)
+                            )
+                            Text(
+                                text = "${shopSettings.shopName} • ${shopSettings.shopTagline}",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
+                            )
                         }
                     }
                 }
