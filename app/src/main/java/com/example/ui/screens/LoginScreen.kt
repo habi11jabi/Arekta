@@ -21,7 +21,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Login
 import androidx.compose.material.icons.filled.Person
@@ -64,7 +63,7 @@ import com.example.viewmodel.InventoryViewModel
 
 @Composable
 fun LoginScreen(viewModel: InventoryViewModel) {
-    var username by remember { mutableStateOf("Conock") }
+    var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var isPasswordVisible by remember { mutableStateOf(false) }
     val loginError by viewModel.loginError.collectAsStateWithLifecycle()
@@ -239,48 +238,6 @@ fun LoginScreen(viewModel: InventoryViewModel) {
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
-                        )
-                    }
-                }
-            }
-
-            // Quick Info Card for Admin
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF3C7).copy(alpha = 0.7f)),
-                border = CardDefaults.outlinedCardBorder()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Key,
-                        contentDescription = "Admin Credentials",
-                        tint = Color(0xFFB45309),
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                        Text(
-                            text = "ডিফল্ট এডমিন একাউন্ট:",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF92400E)
-                        )
-                        Text(
-                            text = "ইউজার নেম: Conock  |  পাসওয়ার্ড: 1219",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF78350F)
-                        )
-                        Text(
-                            text = "এডমিন লগইন করে সেটিংসে গিয়ে যতখুশি নতুন ইউজার এড করতে পারবেন।",
-                            fontSize = 10.sp,
-                            color = Color(0xFF92400E).copy(alpha = 0.9f)
                         )
                     }
                 }
