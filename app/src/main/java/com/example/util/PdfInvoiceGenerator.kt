@@ -244,7 +244,7 @@ object PdfInvoiceGenerator {
         paint.color = Color.parseColor("#A16207")
         paint.textSize = 10.5f
         paint.textAlign = Paint.Align.LEFT
-        canvas.drawText("অফিসিয়াল ওয়ারেন্টি ও গ্যারান্টি নীতিমালা / Warranty Policy", 54f, 504f, paint)
+        canvas.drawText("ওয়ারেন্টি ও গ্যারান্টি নীতিমালা / Warranty Policy", 54f, 504f, paint)
 
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
         paint.color = Color.parseColor("#451A03")
@@ -266,36 +266,46 @@ object PdfInvoiceGenerator {
         canvas.drawText("* বিক্রিত মাল ফেরত নেওয়া হয় না। ওয়ারেন্টি দাবির জন্য মূল ক্যাশমেমো সংরক্ষণ বাধ্যতামূলক।", 40f, 650f, paint)
         canvas.drawText("* ${shopSettings.shopName} এর সাথে থাকার জন্য ধন্যবাদ!", 40f, 664f, paint)
 
-        // Signature lines
-        paint.strokeWidth = 1f
-        paint.color = Color.parseColor("#94A3B8")
-        canvas.drawLine(54f, 725f, 180f, 725f, paint)
-        canvas.drawLine((PAGE_WIDTH - 180).toFloat(), 725f, (PAGE_WIDTH - 54).toFloat(), 725f, paint)
-
-        paint.textAlign = Paint.Align.CENTER
-        paint.textSize = 9.5f
-        paint.color = Color.parseColor("#334155")
-        canvas.drawText("ক্রেতার স্বাক্ষর", 117f, 742f, paint)
-        canvas.drawText("কর্তৃপক্ষের স্বাক্ষর ও সিল", (PAGE_WIDTH - 117).toFloat(), 742f, paint)
-
-        // Shop QR Code placed in bottom center, directly above the tagline
+        // Center QR Code with Equal Signatures on both sides (কিউ আর কোড বরাবর দু'পাশে সমান থাকবে)
+        val qrSize = 60
+        val qrLeft = (PAGE_WIDTH - qrSize) / 2
+        val qrTop = 716
         try {
             val qrDrawable = androidx.core.content.ContextCompat.getDrawable(context, com.example.R.drawable.shop_qr_code)
             if (qrDrawable != null) {
-                val qrSize = 56
-                val qrLeft = (PAGE_WIDTH - qrSize) / 2
-                val qrTop = 728
                 qrDrawable.setBounds(qrLeft, qrTop, qrLeft + qrSize, qrTop + qrSize)
                 qrDrawable.draw(canvas)
             }
         } catch (_: Exception) {}
+
+        // Signature lines (সমান দৈর্ঘ্য ১৪০ পয়েন্ট এবং সমান উচ্চতা ৭৫২f)
+        paint.strokeWidth = 1f
+        paint.color = Color.parseColor("#94A3B8")
+        val sigLineY = 752f
+        val leftLineStart = 54f
+        val leftLineEnd = 194f
+        val rightLineStart = (PAGE_WIDTH - 194).toFloat()
+        val rightLineEnd = (PAGE_WIDTH - 54).toFloat()
+
+        canvas.drawLine(leftLineStart, sigLineY, leftLineEnd, sigLineY, paint)
+        canvas.drawLine(rightLineStart, sigLineY, rightLineEnd, sigLineY, paint)
+
+        // Equal Signature Labels below the lines
+        paint.textAlign = Paint.Align.CENTER
+        paint.textSize = 9.5f
+        paint.color = Color.parseColor("#334155")
+        val textY = 768f
+        val leftCenter = (leftLineStart + leftLineEnd) / 2
+        val rightCenter = (rightLineStart + rightLineEnd) / 2
+        canvas.drawText("ক্রেতার স্বাক্ষর", leftCenter, textY, paint)
+        canvas.drawText("কর্তৃপক্ষের স্বাক্ষর", rightCenter, textY, paint)
 
         // Footer brand tagline
         paint.textAlign = Paint.Align.CENTER
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
         paint.textSize = 8.5f
         paint.color = Color.parseColor("#94A3B8")
-        canvas.drawText("${shopSettings.shopName} • ${shopSettings.shopTagline}", (PAGE_WIDTH / 2).toFloat(), 802f, paint)
+        canvas.drawText("${shopSettings.shopName} • ${shopSettings.shopTagline}", (PAGE_WIDTH / 2).toFloat(), 804f, paint)
     }
     /**
      * Saves the PDF to user's device Downloads directory and offers immediate viewing.

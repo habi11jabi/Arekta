@@ -310,7 +310,7 @@ val BanglaStrings = AppStrings(
     remarksLabel = "মন্তব্য বা অতিরিক্ত নোট",
     btnCompleteSale = "বিক্রি নিশ্চিত করুন ও মেমো দেখুন",
 
-    invoiceTitle = "অফিসিয়াল ক্যাশমেমো ও ওয়ারেন্টি কার্ড",
+    invoiceTitle = "ক্যাশমেমো ও ওয়ারেন্টি কার্ড",
     invoiceNoLabel = "ইনভয়েস নং:",
     dateLabel = "তারিখ:",
     customerInfoSection = "গ্রাহকের তথ্য",

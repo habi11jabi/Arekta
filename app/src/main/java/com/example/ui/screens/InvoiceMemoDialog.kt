@@ -436,70 +436,94 @@ ${shopSettings.shopName} • ${shopSettings.shopPhone}
                             }
                         }
 
-                        // Store Stamp
+                        // Equal Signatures on both sides of QR Code (কিউ আর কোড বরাবর দু'পাশে ক্রেতার স্বাক্ষর এবং কর্তৃপক্ষের স্বাক্ষরিত সমান থাকবে)
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(top = 10.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.Bottom
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = strings.memoDisclaimer,
-                                fontSize = 9.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            // Left: ক্রেতার স্বাক্ষর (Equal left side)
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
                                 Box(
                                     modifier = Modifier
-                                        .size(44.dp)
-                                        .border(1.5.dp, AppleBlue, CircleShape),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.CheckCircle,
-                                        contentDescription = "Verified Seal",
-                                        tint = AppleBlue,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                }
+                                        .width(82.dp)
+                                        .height(1.dp)
+                                        .background(Color(0xFF94A3B8))
+                                )
                                 Text(
-                                    text = "${shopSettings.shopName}\nAuthorized",
-                                    fontSize = 8.sp,
-                                    textAlign = TextAlign.Center,
-                                    fontWeight = FontWeight.Bold,
-                                    color = AppleBlue
+                                    text = "ক্রেতার স্বাক্ষর",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            // Center: QR Code
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.padding(horizontal = 6.dp)
+                            ) {
+                                Image(
+                                    painter = painterResource(id = R.drawable.shop_qr_code),
+                                    contentDescription = "Shop QR Code",
+                                    modifier = Modifier
+                                        .size(64.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(8.dp))
+                                        .background(Color.White)
+                                        .padding(4.dp)
+                                )
+                            }
+
+                            // Right: কর্তৃপক্ষের স্বাক্ষর (Equal right side)
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(82.dp)
+                                        .height(1.dp)
+                                        .background(Color(0xFF94A3B8))
+                                )
+                                Text(
+                                    text = "কর্তৃপক্ষের স্বাক্ষর",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
 
-                        HorizontalDivider(modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+                        // Bottom Center Shop Tagline
+                        Text(
+                            text = "${shopSettings.shopName} • ${shopSettings.shopTagline}",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 6.dp)
+                        )
 
-                        // Bottom Center QR Code and Shop Tagline
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Image(
-                                painter = painterResource(id = R.drawable.shop_qr_code),
-                                contentDescription = "Shop QR Code",
-                                modifier = Modifier
-                                    .size(72.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(8.dp))
-                                    .background(Color.White)
-                                    .padding(4.dp)
-                            )
-                            Text(
-                                text = "${shopSettings.shopName} • ${shopSettings.shopTagline}",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center
-                            )
-                        }
+                        // Disclaimer
+                        Text(
+                            text = strings.memoDisclaimer,
+                            fontSize = 8.5.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 2.dp)
+                        )
                     }
                 }
 
