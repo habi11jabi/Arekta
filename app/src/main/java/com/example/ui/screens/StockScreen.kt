@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Inventory
 import androidx.compose.material.icons.filled.Layers
@@ -67,7 +68,7 @@ fun StockScreen(
     onBrandFilterChange: (String) -> Unit,
     onAddProductClick: () -> Unit,
     onBulkAddClick: () -> Unit = {},
-    onGoogleDriveSyncClick: () -> Unit = {},
+    onGitHubSyncClick: () -> Unit = {},
     lastSyncTime: Long = 0L,
     onOpenScanner: () -> Unit,
     onSellProduct: (Product) -> Unit,
@@ -218,20 +219,20 @@ fun StockScreen(
                         Text(if (isEnglish) "Bulk Add (Multiple)" else "বাল্ক স্টক যোগ", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
 
-                    // Google Drive Sync Button
+                    // GitHub.com Backup Button
                     Surface(
                         shape = RoundedCornerShape(12.dp),
-                        color = Color(0xFF0F766E).copy(alpha = 0.12f),
+                        color = Color(0xFF24292F).copy(alpha = 0.12f),
                         modifier = Modifier.height(44.dp)
                     ) {
                         IconButton(
-                            onClick = onGoogleDriveSyncClick,
-                            modifier = Modifier.testTag("stock_drive_sync_button")
+                            onClick = onGitHubSyncClick,
+                            modifier = Modifier.testTag("stock_github_sync_button")
                         ) {
                             Icon(
-                                imageVector = Icons.Default.CloudSync,
-                                contentDescription = "Google Drive Sync",
-                                tint = Color(0xFF0F766E),
+                                imageVector = Icons.Default.Code,
+                                contentDescription = "GitHub Backup",
+                                tint = Color(0xFF24292F),
                                 modifier = Modifier.size(22.dp)
                             )
                         }

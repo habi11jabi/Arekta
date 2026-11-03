@@ -23,6 +23,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Shop App"
+rootProject.name = "Apple Area Shop"
 
 include(":app")

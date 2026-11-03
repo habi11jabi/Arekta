@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Logout
@@ -81,7 +82,7 @@ fun SettingsScreen(
     onResetDefaults: () -> Unit,
     onClearAllData: () -> Unit = {},
     onLoadDemoData: () -> Unit = {},
-    onOpenGoogleDriveSync: () -> Unit = {},
+    onOpenGitHubSync: () -> Unit = {},
     lastSyncTime: Long = 0L,
     currentUser: AppUser? = null,
     onOpenUserManagement: () -> Unit = {},

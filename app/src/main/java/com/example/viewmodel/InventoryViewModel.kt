@@ -15,7 +15,9 @@ import com.example.data.model.TransactionType
 import android.content.Context
 import com.example.data.repository.InventoryRepository
 import com.example.data.repository.SettingsManager
-import com.example.util.GoogleDriveSyncManager
+import com.example.util.GitHubBackupConfig
+import com.example.util.GitHubBackupManager
+import com.example.util.GitHubSyncResult
 import com.example.util.ParsedBackupData
 import com.example.data.model.AppUser
 import kotlinx.coroutines.Dispatchers
@@ -135,12 +137,25 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
     private val _isUserManagementOpen = MutableStateFlow(false)
     val isUserManagementOpen: StateFlow<Boolean> = _isUserManagementOpen.asStateFlow()
 
-    // Google Drive Sync State
-    private val _isDriveSyncing = MutableStateFlow(false)
-    val isDriveSyncing: StateFlow<Boolean> = _isDriveSyncing.asStateFlow()
+    // GitHub Cloud Sync & Automated Backup State
+    private val _githubConfig = MutableStateFlow(GitHubBackupManager.loadConfig(application))
+    val githubConfig: StateFlow<GitHubBackupConfig> = _githubConfig.asStateFlow()
 
-    private val _lastDriveSyncTime = MutableStateFlow(GoogleDriveSyncManager.getLastSyncTime(application))
-    val lastDriveSyncTime: StateFlow<Long> = _lastDriveSyncTime.asStateFlow()
+    private val _isGitHubSyncing = MutableStateFlow(false)
+    val isGitHubSyncing: StateFlow<Boolean> = _isGitHubSyncing.asStateFlow()
+
+    private val _lastGitHubSyncTime = MutableStateFlow(GitHubBackupManager.getLastSyncTime(application))
+    val lastGitHubSyncTime: StateFlow<Long> = _lastGitHubSyncTime.asStateFlow()
+
+    private val _lastGitHubCommitSha = MutableStateFlow(GitHubBackupManager.getLastCommitSha(application))
+    val lastGitHubCommitSha: StateFlow<String> = _lastGitHubCommitSha.asStateFlow()
+
+    private val _lastGitHubSyncStatus = MutableStateFlow(GitHubBackupManager.getLastSyncStatus(application))
+    val lastGitHubSyncStatus: StateFlow<String> = _lastGitHubSyncStatus.asStateFlow()
+
+    // Backward-compatibility aliases
+    val isDriveSyncing: StateFlow<Boolean> get() = _isGitHubSyncing.asStateFlow()
+    val lastDriveSyncTime: StateFlow<Long> get() = _lastGitHubSyncTime.asStateFlow()
 
     // Sale Checkout Dialog State
     private val _productToSell = MutableStateFlow<Product?>(null)
@@ -909,9 +924,9 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    // Google Drive Synchronization & Automated Cloud Backup
+    // GitHub.com Synchronization & Automated Cloud Backup
     fun getFullBackupJson(): String {
-        return GoogleDriveSyncManager.createFullBackupJson(
+        return GitHubBackupManager.createFullBackupJson(
             products = allProducts.value,
             sales = allSales.value,
             expenses = allExpenses.value,
@@ -922,38 +937,91 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         )
     }
 
+    fun saveGitHubConfig(config: GitHubBackupConfig) {
+        _githubConfig.value = config
+        GitHubBackupManager.saveConfig(getApplication(), config)
+    }
+
     /**
-     * Automatically saves a complete snapshot of all shop data in the background.
+     * Automatically saves a complete snapshot of all shop data in the background
+     * and pushes to GitHub.com if configured.
      */
     fun triggerAutoCloudBackup() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val json = getFullBackupJson()
-                GoogleDriveSyncManager.saveAutoBackupSnapshot(getApplication(), json)
-                _lastDriveSyncTime.value = System.currentTimeMillis()
+                GitHubBackupManager.saveAutoBackupSnapshot(getApplication(), json)
+
+                val config = _githubConfig.value
+                if (config.autoSyncEnabled && config.token.isNotBlank() && config.owner.isNotBlank() && config.repo.isNotBlank()) {
+                    val result = GitHubBackupManager.pushBackupToGitHub(getApplication(), config, json)
+                    if (result.success) {
+                        _lastGitHubSyncTime.value = result.timestamp
+                        _lastGitHubCommitSha.value = result.commitSha.orEmpty()
+                        _lastGitHubSyncStatus.value = result.message
+                    }
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
     }
 
-    fun syncAllDataToGoogleDrive(context: Context) {
-        viewModelScope.launch {
-            _isDriveSyncing.value = true
+    /**
+     * Pushes current database backup to GitHub.com manually.
+     */
+    fun pushBackupToGitHub(isManual: Boolean = true) {
+        viewModelScope.launch(Dispatchers.IO) {
+            _isGitHubSyncing.value = true
             val json = getFullBackupJson()
-            val success = GoogleDriveSyncManager.shareBackupFileToDrive(context, json)
-            _isDriveSyncing.value = false
-            if (success) {
-                val now = System.currentTimeMillis()
-                _lastDriveSyncTime.value = now
-                _snackbarMessage.value = "গুগল ড্রাইভ ব্যাকআপ ফাইল সফলভাবে তৈরি ও পাঠানো হয়েছে!"
-            } else {
-                _snackbarMessage.value = "গুগল ড্রাইভে সিঙ্ক করতে সমস্যা হয়েছে।"
+            val config = _githubConfig.value
+            val result = GitHubBackupManager.pushBackupToGitHub(getApplication(), config, json)
+            _isGitHubSyncing.value = false
+
+            _lastGitHubSyncTime.value = result.timestamp
+            _lastGitHubCommitSha.value = result.commitSha.orEmpty()
+            _lastGitHubSyncStatus.value = result.message
+
+            if (isManual) {
+                _snackbarMessage.value = if (result.success) {
+                    "GitHub.com এ সফলভাবে ডাটা ব্যাকআপ হয়েছে!"
+                } else {
+                    result.message
+                }
             }
         }
     }
 
-    fun restoreFromDriveBackup(backupData: ParsedBackupData) {
+    /**
+     * Fetches and restores backup directly from GitHub repository.
+     */
+    fun restoreFromGitHub() {
+        viewModelScope.launch(Dispatchers.IO) {
+            _isGitHubSyncing.value = true
+            val config = _githubConfig.value
+            val result = GitHubBackupManager.fetchBackupFromGitHub(config)
+            _isGitHubSyncing.value = false
+
+            result.onSuccess { backupData ->
+                repository.restoreDatabase(
+                    products = backupData.products,
+                    sales = backupData.sales,
+                    expenses = backupData.expenses,
+                    employees = backupData.employees,
+                    salaryPayments = backupData.salaryPayments,
+                    users = backupData.users
+                )
+                backupData.shopSettings?.let {
+                    settingsManager.saveSettings(it)
+                }
+                _snackbarMessage.value = "GitHub থেকে ${backupData.products.size}টি প্রোডাক্ট ও সকল ডাটা সফলভাবে রিস্টোর হয়েছে!"
+            }.onFailure { err ->
+                _snackbarMessage.value = err.message ?: "GitHub থেকে রিস্টোর করতে সমস্যা হয়েছে।"
+            }
+        }
+    }
+
+    fun restoreRawBackup(backupData: ParsedBackupData) {
         viewModelScope.launch {
             repository.restoreDatabase(
                 products = backupData.products,
@@ -967,8 +1035,17 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                 settingsManager.saveSettings(it)
             }
             triggerAutoCloudBackup()
-            _snackbarMessage.value = "গুগল ড্রাইভ ব্যাকআপ থেকে ${backupData.products.size}টি প্রোডাক্ট ও সকল ডাটা সফলভাবে রিস্টোর হয়েছে!"
+            _snackbarMessage.value = "ব্যাকআপ ডাটা সফলভাবে রিস্টোর হয়েছে!"
         }
+    }
+
+    // Compatibility methods for existing callers
+    fun syncAllDataToGoogleDrive(context: Context) {
+        pushBackupToGitHub(isManual = true)
+    }
+
+    fun restoreFromDriveBackup(backupData: ParsedBackupData) {
+        restoreRawBackup(backupData)
     }
 
     // Product Return Management (স্টক লিস্ট থেকে প্রোডাক্ট রিটার্ন)
